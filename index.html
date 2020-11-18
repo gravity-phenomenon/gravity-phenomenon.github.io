@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html>	
+	<head>
+		<title>Gravity phenomena</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r122/three.min.js"></script>
+        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r122/three.js"></script>
+        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r122/three.module.js"></script>
+        <script type="text/javascript" src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
+        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.7/dat.gui.min.js"></script>
+        
+		<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+		<style>
+		  body{
+		/* set margin to 0 and overflow to hidden, 
+		to use the complete page */
+		      margin: 0;
+		      overflow: hidden;
+		  }
+          #gui { 
+              position: absolute; 
+              top: 2px; 
+              left: 2px; 
+            }
+            @media only screen and (max-width: 768px) {
+                #gui{
+                    width: 100%;
+                }
+            }
+		</style>
+	</head>
+	<body>
+		<!--Div which will hold the Output -->
+        
+        <div id="WebGL-output">
+        </div>
+        
+		<!--Javascript code that runs our Three.js examples -->
+		<script type="text/javascript">
+            
+            const HEIGHT=window.innerHeight
+            const WIDTH=window.innerWidth
+            
+            var g=0.001
+            
+            
+		    var scene = new THREE.Scene();
+            //window.addEventListener("wheel", onMouseWheel);
+            
+            
+            
+            //setting camera
+            var camera = new THREE.PerspectiveCamera(100, WIDTH / HEIGHT, 0.1, 100000);
+            camera.position.z = 200;
+            
+
+            var material =new THREE.MeshPhongMaterial({shininess:10, color: 0xffffff})
+            
+            
+            var gui = new dat.gui.GUI();
+            gui.domElement.id = 'gui';
+            
+            var objs=[]/*new Objects([0,0,0], [0,0,0], [100000, 30], "1", "star"),
+                 new Objects([100,0,0], [0,1,0], [100, 7], "2", "planet"),
+                 new Objects([-100,0,0], [0,0.65,0.4], [100, 10], "3", "planet")]
+            */
+            
+            //0;0;0;0;0;0;100000;30;#ffffff;Star;star---0;100;0;1;0;0;100;10;#418c00;Planet;planet---
+            var objs_copy=[]
+            
+            var start_button;
+            
+            var setting={
+                start:false,
+                G:0.001,
+                light_general:"#418c00",
+                general_light:new THREE.AmbientLight(0x418c00),
+                ok: function(){
+                    g=this.G
+                    this.general_light.color=new THREE.Color(this.light_general); // soft white light
+                },
+                starter:function(){
+                    if(this.start){
+                        start_button.name("Start")
+                    }else{
+                        start_button.name("Stop")
+                    }
+                    this.start=!this.start
+                },
+                reloader:function(){
+                    objs=objs_copy
+                }
+            }
+            
+            start_button=gui.add(setting, 'starter').name("Start")
+            //gui.add(setting, 'reloader').name("Reload")
+            
+            scene.add(setting.general_light);
+            
+            
+            class Objects{
+                constructor(coord, velocity,  params, name, objType){
+                    
+                    this.coord=coord
+                    this.coord_=coord
+                    this.velocity=velocity
+                    this.velocity_=velocity
+                    this.accel=[0,0,0];
+                    this.params=params
+                    this.name=name
+                    
+                    
+                    
+                    
+                    this.data=gui.addFolder(name)
+                    this.data.add(params, 0).name("Mass")
+                    this.data.add([objType], 0).name("Type")
+                    var coods=[this.data.add(coord, 0), this.data.add(coord, 1), this.data.add(coord, 2)]
+                    for(var i=0; i<3; i++){
+                    coods[i].domElement.style.pointerEvents = "none"
+                    coods[i].listen()
+                    }
+                    coods[0].name("X")
+                    coods[1].name("Y")
+                    coods[2].name("Z")
+                    var vels=[this.data.add(velocity, 0), this.data.add(velocity, 1), this.data.add(velocity, 2)]
+                    for(var i=0; i<3; i++){
+                    vels[i].domElement.style.pointerEvents = "none"
+                    vels[i].listen()
+                    }
+                    vels[0].name("VelocityX")
+                    vels[1].name("VelocityY")
+                    vels[2].name("VelocityZ")
+                    
+                    
+                    
+                    this.objType=objType
+                    if(objType=="planet"){
+                        this.generatePlanet()
+                    }
+                    if(objType=="star"){
+                        this.generateStar()
+                    }
+                    
+                        
+                }
+                generatePlanet(){
+                    var geometry = new THREE.SphereGeometry( this.params[1], 32, 32 );
+                    this.obj = new THREE.Mesh( geometry, new THREE.MeshLambertMaterial({shininess:1200, color: new THREE.Color(this.params[2])})); 
+                    scene.add( this.obj ); 
+                }
+                generateStar(){
+                    var geometry = new THREE.SphereGeometry( this.params[1], 32, 32 );
+                    this.obj = new THREE.Mesh( geometry, new THREE.MeshLambertMaterial({color: new THREE.Color(this.params[2]), emissive:new THREE.Color(this.params[2])})); 
+                    this.point_light = new THREE.PointLight( new THREE.Color(this.params[2]), 1.4, 10050 );
+                    this.point_light.position.set(this.coord[0], this.coord[1], this.coord[2]);
+                    const pointLightHelper = new THREE.PointLightHelper( this.point_light, this.params[1]-2 );
+                    scene.add( pointLightHelper );
+                    
+                    scene.add(this.point_light)
+                    scene.add(this.obj);   
+                }
+                
+                confirm(){
+                    if(this.objType=="star"){
+                        this.point_light.position.set(this.coord[0], this.coord[1], this.coord[2])
+                    }
+                }
+            }
+            
+            var settings=gui.addFolder('Settings')
+            settings.addColor(setting, 'light_general')
+            settings.add(setting, 'G')
+            settings.add(setting, 'ok')
+            
+            
+            
+            var conv=gui.addFolder("Convert")
+            
+            var adding=gui.addFolder("Add")
+            
+            convInfo={
+                str:"",
+                f:function(){
+                    objects_str=this.str.split('---')
+                    for(i=0; i<objects_str.length-1; i++){
+                        console.log(objects_str[i])
+                        var chars=objects_str[i].split(';')
+                        objs.push(new Objects(
+                        [parseFloat(chars[0]), parseFloat(chars[1]), parseFloat(chars[2])],
+                        [parseFloat(chars[3]), parseFloat(chars[4]), parseFloat(chars[5])],
+                        [parseFloat(chars[6]), parseFloat(chars[7]),  chars[8]],
+                        chars[9],
+                        chars[10]
+                        ))
+                        console.log(chars[10])
+                    }
+                },
+                p:function(){
+                    this.str=""
+                    for(i=0;i<objs.length; i++){
+                        this.str+=objs[i].coord[0]+";"+objs[i].coord[1]+";"+objs[i].coord[2]+";"+
+                            objs[i].velocity[0]+";"+objs[i].velocity[1]+";"+objs[i].velocity[2]+";"+
+                            objs[i].params[0]+";"+objs[i].params[1]+";"+objs[i].params[2]+";"+objs[i].name+";"+objs[i].objType+"---"
+                    }
+                }
+            }
+            var strs=conv.add(convInfo, 'str')
+            strs.name("G Code")
+            strs.listen()
+            conv.add(convInfo, 'f').name("Unparse")
+            conv.add(convInfo, 'p').name("Parse")
+            
+            infoToAdd ={
+                name: "planet X",
+                objtype: "planet",
+                colort: "#303030",
+                mass: 100,
+                radius: 10,
+                x: 0,
+                y: 0,
+                z: 0,
+                velx: 0,
+                vely: 0,
+                velz: 0,
+                
+            }
+            adding.add(infoToAdd, 'name').name("Name")
+            adding.add(infoToAdd, 'objtype', ['planet', 'star']).name("Type")
+            adding.addColor(infoToAdd, 'colort').name("Color")
+            adding.add(infoToAdd, 'mass').name("Mass")
+            adding.add(infoToAdd, 'radius').name("Radius")
+            adding.add(infoToAdd, 'x').name("X")
+            adding.add(infoToAdd, 'y').name("Y")
+            adding.add(infoToAdd, 'z').name("Z")
+            adding.add(infoToAdd, 'velx').name("Velocity X")
+            adding.add(infoToAdd, 'vely').name("Velocity Y")
+            adding.add(infoToAdd, 'velz').name("Velocity Z")
+            
+            
+            adding.add([addObject], 0).name("add")
+            function addObject(){
+                objs.push(new Objects([infoToAdd.x, infoToAdd.y, infoToAdd.z], [infoToAdd.velx, infoToAdd.vely, infoToAdd.velz], [infoToAdd.mass, infoToAdd.radius, infoToAdd.colort], infoToAdd.name, infoToAdd.objtype))
+                
+            }
+            
+            function confirm(objects){
+                for(i=0; i<objects.length; i++){
+                    objects[i].coord_=objects[i].coord
+                    objects[i].velocity_=objects[i].velocity
+                    objects[i].accel=[0,0,0]
+                    objects[i].confirm()
+                }
+            }
+            
+    
+            
+            var renderer = new THREE.WebGLRenderer(); 
+            renderer.setSize( WIDTH, HEIGHT ); 
+            document.body.appendChild( renderer.domElement );
+            
+
+            
+            controls = new THREE.OrbitControls( camera, renderer.domElement );
+            controls.rotateSpeed = 1.0;
+            controls.zoomSpeed = 1.2;
+            controls.panSpeed = 0.8;
+            controls.noZoom = false;
+            controls.noPan = false;
+            controls.staticMoving = true;
+            controls.dynamicDampingFactor = 0.0;
+
+            
+            //main loop
+            additional_fl=true
+            function render() {
+	            requestAnimationFrame(render);
+                if(setting.start || additional_fl){
+                    additional_fl=false
+                    objs_copy=objs
+                for(i=0; i<objs.length; i++){
+                    for(j=0; j<objs.length; j++){
+                        if(i!=j){
+                            distant_x=objs[i].coord_[0]-objs[j].coord_[0]
+                            distant_y=objs[i].coord_[1]-objs[j].coord_[1]
+                            distant_z=objs[i].coord_[2]-objs[j].coord_[2]
+                            
+                            distant=Math.sqrt(distant_x*distant_x+distant_y*distant_y+distant_z*distant_z)
+                            
+                            objs[i].accel[0]+=-distant_x/(distant*distant*distant)*g*(objs[j].params[0])
+                            objs[i].accel[1]+=-distant_y/(distant*distant*distant)*g*(objs[j].params[0])
+                            objs[i].accel[2]+=-distant_z/(distant*distant*distant)*g*(objs[j].params[0])
+                            
+                        }
+                    }
+                    for(dim=0; dim<3; dim++){
+                        objs[i].velocity[dim]=objs[i].velocity_[dim]+objs[i].accel[dim]
+                        objs[i].coord[dim]=objs[i].coord[dim]+(objs[i].velocity[dim]+objs[i].velocity_[dim])/2
+                    }
+                }
+                }
+                for(i=0; i<objs.length; i++){
+                    objs[i].obj.position.x=objs[i].coord[0]
+                    objs[i].obj.position.y=objs[i].coord[1]
+                    objs[i].obj.position.z=objs[i].coord[2]
+                }
+                confirm(objs)
+                
+	           renderer.render(scene, camera);
+            }
+            render()
+		</script>
+	</body>
+</html>
