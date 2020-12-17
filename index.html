@@ -3,10 +3,8 @@
 	<head>
 		<title>Gravity phenomenon</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r122/three.min.js"></script>
-        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r122/three.js"></script>
-        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r122/three.module.js"></script>
-        <script type="text/javascript" src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
+		<script type="text/javascript" src="Libraries/three/build/three.js"></script>
+        <script type="text/javascript" src="Libraries/three/examples/js/controls/OrbitControls.js"></script>
         <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.7/dat.gui.min.js"></script>
         
 		<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
@@ -109,12 +107,16 @@
                     this.params=params
                     this.name=name
                     
-                    
-                    
+                    this.points=[]
+                    this.toTrace=false    
+                    var materialLine = new THREE.LineBasicMaterial({color: new THREE.Color(setting.general_light)});
+                    var geometryLine = new THREE.BufferGeometry().setFromPoints( this.points );
+                    this.line = new THREE.Line( geometryLine, materialLine );
+                    scene.add(this.line);
                     
                     this.data=gui.addFolder(name)
                     this.data.add(params, 0).name("Mass")
-                    this.data.add([objType], 0).name("Type")
+                    this.data.add(this, 'toTrace', [true, false]).name("Trace")
                     var coods=[this.data.add(coord, 0), this.data.add(coord, 1), this.data.add(coord, 2)]
                     for(var i=0; i<3; i++){
                     coods[i].domElement.style.pointerEvents = "none"
@@ -303,8 +305,22 @@
                     objs[i].obj.position.x=objs[i].coord[0]
                     objs[i].obj.position.y=objs[i].coord[1]
                     objs[i].obj.position.z=objs[i].coord[2]
+                    
+                    console.log(objs[i].toTrace)
+                    scene.remove(objs[i].line)
+                    if(objs[i].toTrace=='true'){
+                        objs[i].points.push( new THREE.Vector3(objs[i].coord[0],objs[i].coord[1],objs[i].coord[2]))
+                        materialLine = new THREE.LineBasicMaterial({
+	                       color: new THREE.Color(setting.general_light)
+                        });
+                        geometry = new THREE.BufferGeometry().setFromPoints( objs[i].points );
+                        objs[i].line = new THREE.Line( geometry, materialLine );
+                        scene.add(objs[i].line);
+                    }
                 }
                 confirm(objs)
+                
+                
                 
 	           renderer.render(scene, camera);
             }
