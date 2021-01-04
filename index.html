@@ -41,7 +41,7 @@
             
             var g=0.001
             var STOP_TIME=-1
-            
+            time=0
 		    var scene = new THREE.Scene();
             //window.addEventListener("wheel", onMouseWheel);
             
@@ -82,6 +82,7 @@
                     if(this.start){
                         start_button.name("Start")
                     }else{
+                        time+=1
                         start_button.name("Stop")
                     }
                     this.start=!this.start
@@ -296,7 +297,7 @@
             
             //main loop
             additional_fl=true
-            time=0
+            
             dx=5
             function render() {
 	            requestAnimationFrame(render);
