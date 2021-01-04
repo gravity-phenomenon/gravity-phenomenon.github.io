@@ -206,7 +206,7 @@
                     this.str="-1?"
                     for(i=0;i<objs.length; i++){
                         this.str+=objs[i].coord[0]+";"+objs[i].coord[1]+";"+objs[i].coord[2]+";"+
-                            objs[i].velocity[0]+";"+objs[i].velocity[1]+";"+objs[i].velocity[2]+";"+
+                            (-objs[i].velocity[0])+";"+(-objs[i].velocity[1])+";"+(-objs[i].velocity[2])+";"+
                             objs[i].params[0]+";"+objs[i].params[1]+";"+objs[i].params[2]+";"+objs[i].name+";"+objs[i].objType+"---"
                     }
                 }
@@ -306,7 +306,7 @@
                     console.log(time)
                     if(time==STOP_TIME){
                         setting.start=false
-                        start_button.name="start"
+                        start_button.name("start")
                     }
                     additional_fl=false
                     objs_copy=objs
