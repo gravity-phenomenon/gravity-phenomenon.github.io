@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html>	
+	<head>
+		<title>Gravity phenomenon</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<script type="text/javascript" src="Libraries/three/build/three.js"></script>
+        <script type="text/javascript" src="Libraries/three/examples/js/controls/OrbitControls.js"></script>
+        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.7/dat.gui.min.js"></script>
+        
+		<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+		<style>
+		  body{
+		/* set margin to 0 and overflow to hidden, 
+		to use the complete page */
+		      margin: 0;
+		      overflow: hidden;
+		  }
+          #gui { 
+              position: absolute; 
+              top: 2px; 
+              left: 2px; 
+            }
+            @media only screen and (max-width: 768px) {
+                #gui{
+                    width: 100%;
+                }
+            }
+		</style>
+	</head>
+	<body>
+		<!--Div which will hold the Output -->
+        
+        <div id="WebGL-output">
+        </div>
+        
+		<!--Javascript code that runs our Three.js examples -->
+		<script type="text/javascript">
+            
+            const HEIGHT=window.innerHeight
+            const WIDTH=window.innerWidth
+            
+            var g=0.001
+            var STOP_TIME=-1
+            time=0
+		    var scene = new THREE.Scene();
+            //window.addEventListener("wheel", onMouseWheel);
+            
+            
+            
+            //setting camera
+            var camera = new THREE.PerspectiveCamera(100, WIDTH / HEIGHT, 0.1, 100000);
+            camera.position.z = 200;
+            
+
+            var material =new THREE.MeshPhongMaterial({shininess:10, color: 0xffffff})
+            
+            
+            var gui = new dat.gui.GUI();
+            gui.domElement.id = 'gui';
+            
+            var objs=[]/*
+                 new Objects([0,0,0], [0,0,0], [100000, 30], "1", "star"),
+                 new Objects([100,0,0], [0,1,0], [100, 7], "2", "planet"),
+                 new Objects([-100,0,0], [0,0.65,0.4], [100, 10], "3", "planet")    
+                     ]   */
+            
+            //0;0;0;0;0;0;100000;30;#ffffff;Star;star---0;100;0;1;0;0;100;10;#418c00;Planet;planet---
+            var objs_copy=[]
+            
+            var start_button;
+            
+            var setting={
+                start:false,
+                G:0.001,
+                light_general:"#418c00",
+                general_light:new THREE.AmbientLight(0x418c00),
+                ok: function(){
+                    g=this.G
+                    this.general_light.color=new THREE.Color(this.light_general); // soft white light
+                },
+                starter:function(){
+                    if(this.start){
+                        start_button.name("Start")
+                    }else{
+                        time+=1
+                        start_button.name("Stop")
+                    }
+                    this.start=!this.start
+                },
+                reloader:function(){
+                    objs=objs_copy
+                }
+            }
+            
+            start_button=gui.add(setting, 'starter').name("Start")
+            //gui.add(setting, 'reloader').name("Reload")
+            
+            scene.add(setting.general_light);
+            
+            
+            class Objects{
+                constructor(coord, velocity,  params, name, objType){
+                    
+                    this.coord=coord
+                    this.coord_=coord
+                    this.velocity=velocity
+                    this.velocity_=velocity
+                    this.accel=[0,0,0];
+                    this.params=params
+                    this.name=name
+                    
+                    this.points=[]
+                    this.toTrace=false    
+                    var materialLine = new THREE.LineBasicMaterial({color: new THREE.Color(setting.general_light)});
+                    var geometryLine = new THREE.BufferGeometry().setFromPoints( this.points );
+                    this.line = new THREE.Line( geometryLine, materialLine );
+                    scene.add(this.line);
+                    
+                    this.data=gui.addFolder(name)
+                    this.data.add(params, 0).name("Mass")
+                    this.data.add(this, 'toTrace', [true, false]).name("Trace")
+                    var coods=[this.data.add(coord, 0), this.data.add(coord, 1), this.data.add(coord, 2)]
+                    for(var i=0; i<3; i++){
+                    coods[i].domElement.style.pointerEvents = "none"
+                    coods[i].listen()
+                    }
+                    coods[0].name("X")
+                    coods[1].name("Y")
+                    coods[2].name("Z")
+                    var vels=[this.data.add(velocity, 0), this.data.add(velocity, 1), this.data.add(velocity, 2)]
+                    for(var i=0; i<3; i++){
+                    vels[i].domElement.style.pointerEvents = "none"
+                    vels[i].listen()
+                    }
+                    vels[0].name("VelocityX")
+                    vels[1].name("VelocityY")
+                    vels[2].name("VelocityZ")
+                    
+                    
+                    
+                    this.objType=objType
+                    if(objType=="planet"){
+                        this.generatePlanet()
+                    }
+                    if(objType=="star"){
+                        this.generateStar()
+                    }
+                    
+                        
+                }
+                generatePlanet(){
+                    var geometry = new THREE.SphereGeometry( this.params[1], 32, 32 );
+                    this.obj = new THREE.Mesh( geometry, new THREE.MeshLambertMaterial({shininess:1200, color: new THREE.Color(this.params[2])})); 
+                    scene.add( this.obj ); 
+                }
+                generateStar(){
+                    var geometry = new THREE.SphereGeometry( this.params[1], 32, 32 );
+                    this.obj = new THREE.Mesh( geometry, new THREE.MeshLambertMaterial({color: new THREE.Color(this.params[2]), emissive:new THREE.Color(this.params[2])})); 
+                    this.point_light = new THREE.PointLight( new THREE.Color(this.params[2]), 1.4, 10050 );
+                    this.point_light.position.set(this.coord[0], this.coord[1], this.coord[2]);
+                    const pointLightHelper = new THREE.PointLightHelper( this.point_light, this.params[1]-2 );
+                    scene.add( pointLightHelper );
+                    
+                    scene.add(this.point_light)
+                    scene.add(this.obj);   
+                }
+                
+                confirm(){
+                    if(this.objType=="star"){
+                        this.point_light.position.set(this.coord[0], this.coord[1], this.coord[2])
+                    }
+                }
+            }
+            
+            var settings=gui.addFolder('Settings')
+            settings.addColor(setting, 'light_general')
+            settings.add(setting, 'G')
+            settings.add(setting, 'ok')
+            
+            
+            
+            var conv=gui.addFolder("Convert")
+            
+            
+            var adding=gui.addFolder("Add")
+            
+            convInfo={
+                str:"267?-413.75195749173866;786.1858715675966;186.31429106828182;1.4238511192057437;-2.4108512435189353;-0.6121306206178726;7000;1;#00d821;0;planet---7.057717843614542;867.3319271345246;407.48779501510404;-0.03335259133994405;-2.7161347325218834;-1.4538483198885341;7000;1;#00d821;1;planet---392.3771068840204;815.1926461674765;567.0325357627814;-1.331680163199493;-2.516907236920139;-2.028677159323454;7000;1;#00d821;2;planet---600.7284756079895;698.6612995806147;624.4861809132619;-1.959112537909287;-2.1322159984459033;-2.2101609169126935;7000;1;#00d821;3;planet---713.3711098557835;548.9663366218698;609.1907560753244;-2.2613625986487;-1.7326332196858913;-2.157454029192698;7000;1;#00d821;4;planet---716.932678816805;305.8530490626377;506.7651647830836;-2.2630755761494146;-0.9437308134467732;-1.7779393155418401;7000;1;#00d821;5;planet---641.4184434821041;170.5009644701457;389.4367165618194;-2.098020143513203;-0.5478661948232231;-1.4003339073578724;7000;1;#00d821;6;planet---500.0768324318943;-5.111122012074216;229.36457595613837;-1.6939941331560588;0.030056752784593906;-0.8368025417808925;7000;1;#00d821;7;planet---185.49862977284835;4.314816109986495;85.9477481306078;-0.6335291009300792;-0.011751520088890808;-0.3149704022623527;7000;1;#00d821;8;planet----150.48349452897548;3.7223470105733516;-73.52488362426791;0.49479417167871165;-0.022828737684989196;0.26238024006598265;7000;1;#00d821;9;planet----469.06311198841274;93.87146350526922;-195.42247743605787;1.4902552673215215;-0.33076501901015987;0.6744401726669074;7000;1;#00d821;10;planet----503.19137246577816;289.44798751434763;-106.88665395785829;1.608724831057186;-0.869256629520622;0.38688252536293544;7000;1;#00d821;11;planet----542.4241100030349;699.244836295211;52.16514628961139;1.918549762482058;-2.713579658965056;-0.40413816283475873;7000;1;#00d821;12;planet----497.7443876334069;-238.26243284549216;-352.4022541914054;1.5928234741121734;0.7731843638371306;1.2565423090262937;7000;1;#00d821;13;planet----545.9833788362704;711.8970681604482;60.645948260433315;1.5182295246560749;-1.6661942999077974;0.0031926399750075406;7000;1;#00d821;14;planet----504.1835283536465;-488.957139602453;-470.7670398873041;1.611863004485654;1.5596364579120536;1.6779624043934702;7000;1;#00d821;15;planet----457.1537016981248;-719.9156033491893;-571.4409906647991;1.4059970490685036;2.2595745825372324;2.0103726004223827;7000;1;#00d821;16;planet----308.1193401466931;-827.703369173686;-545.4053240959165;1.0349208899646842;2.541403535658886;1.9419446142984642;7000;1;#00d821;17;planet---7.097724050254515;-874.9888654238857;-407.6041469205216;-0.025380156542653257;2.745300133797702;1.4521587806640428;7000;1;#00d821;18;planet---285.4767088908948;-861.2806006580173;-266.2042271057624;-0.9179029753025094;2.6991327386057438;0.9514273160420487;7000;1;#00d821;19;planet---595.6323906241948;-758.216992016038;-75.46403868661653;-1.9450811889755157;2.353302559472735;0.2587875907691937;7000;1;#00d821;20;planet---792.4219549581663;-438.79573178949306;190.3432867386699;-2.5389297815683816;1.4498252674800023;-0.6379116595064818;7000;1;#00d821;21;planet---789.9589212184234;-563.9427685710773;111.66572488173892;-2.54514217100882;1.6739870861570374;-0.4278254776728026;7000;1;#00d821;22;planet---638.5477637040578;-141.62040931407324;237.0289134788167;-2.0367082706752595;0.38872665564466036;-0.8475366327473695;7000;1;#00d821;23;planet---",
+                f:function(){
+                    str_time=this.str.split('?')
+                    STOP_TIME=parseInt(str_time[0])
+                    objects_str=str_time[1].split('---')
+                    for(i=0; i<objects_str.length-1; i++){
+                        console.log(objects_str[i])
+                        var chars=objects_str[i].split(';')
+                        objs.push(new Objects(
+                        [parseFloat(chars[0]), parseFloat(chars[1]), parseFloat(chars[2])],
+                        [parseFloat(chars[3]), parseFloat(chars[4]), parseFloat(chars[5])],
+                        [parseFloat(chars[6]), parseFloat(chars[7]),  chars[8]],
+                        chars[9],
+                        chars[10]
+                        ))
+                        console.log(chars[10])
+                    }
+                },
+                p:function(){
+                    this.str="-1?"
+                    for(i=0;i<objs.length; i++){
+                        this.str+=objs[i].coord[0]+";"+objs[i].coord[1]+";"+objs[i].coord[2]+";"+
+                            (-objs[i].velocity[0])+";"+(-objs[i].velocity[1])+";"+(-objs[i].velocity[2])+";"+
+                            objs[i].params[0]+";"+objs[i].params[1]+";"+objs[i].params[2]+";"+objs[i].name+";"+objs[i].objType+"---"
+                    }
+                }
+            }
+            convInfo.f()
+            var strs=conv.add(convInfo, 'str')
+            strs.name("G Code")
+            strs.listen()
+            conv.add(convInfo, 'f').name("Unparse")
+            conv.add(convInfo, 'p').name("Parse")
+            
+            infoToAdd ={
+                name: "planet X",
+                objtype: "planet",
+                colort: "#303030",
+                mass: 100,
+                radius: 10,
+                x: 0,
+                y: 0,
+                z: 0,
+                velx: 0,
+                vely: 0,
+                velz: 0,
+                
+            }
+            adding.add(infoToAdd, 'name').name("Name")
+            adding.add(infoToAdd, 'objtype', ['planet', 'star']).name("Type")
+            adding.addColor(infoToAdd, 'colort').name("Color")
+            adding.add(infoToAdd, 'mass').name("Mass")
+            adding.add(infoToAdd, 'radius').name("Radius")
+            adding.add(infoToAdd, 'x').name("X")
+            adding.add(infoToAdd, 'y').name("Y")
+            adding.add(infoToAdd, 'z').name("Z")
+            adding.add(infoToAdd, 'velx').name("Velocity X")
+            adding.add(infoToAdd, 'vely').name("Velocity Y")
+            adding.add(infoToAdd, 'velz').name("Velocity Z")
+            
+            
+            adding.add([addObject], 0).name("add")
+            function addObject(){
+                objs.push(new Objects([infoToAdd.x, infoToAdd.y, infoToAdd.z], [infoToAdd.velx, infoToAdd.vely, infoToAdd.velz], [infoToAdd.mass, infoToAdd.radius, infoToAdd.colort], infoToAdd.name, infoToAdd.objtype))
+                
+            }
+            
+            function confirm(objects){
+                for(i=0; i<objects.length; i++){
+                    objects[i].coord_=objects[i].coord
+                    objects[i].velocity_=objects[i].velocity
+                    objects[i].accel=[0,0,0]
+                    objects[i].confirm()
+                }
+            }
+            
+    
+            
+            var renderer = new THREE.WebGLRenderer(); 
+            renderer.setSize( WIDTH, HEIGHT ); 
+            document.body.appendChild( renderer.domElement );
+            
+
+            
+            controls = new THREE.OrbitControls( camera, renderer.domElement );
+            controls.rotateSpeed = 1.0;
+            controls.zoomSpeed = 1.2;
+            controls.panSpeed = 0.8;
+            controls.noZoom = false;
+            controls.noPan = false;
+            controls.staticMoving = true;
+            controls.dynamicDampingFactor = 0.0;
+
+            
+//            console.log(111)
+//            massive=[
+//                [-3.0353810585678,9.4396586363085],[0,10],[2.9578850833057,9.6893780588866],[5.0805001752192,8.4407809459963],[6.3290972881095,6.3181658540828],[6.5788167106876,3.6961119170131],[5.3302195977972,1.9480759589667],[3.8319030623289,-0.0496794216578],[1.3347088365483,0.0751802896313],[-1.2873451005214,-0.0496794216578],[-4.2839781714581,0.8243385573654],[-4.4088378827471,3.5712522057241],[-4.4088378827471,6.8176046992389],[-4.4088378827471,-2.5468736474384],[-5.5828558617703,9.1899392137304],[-4.4088378827471,-5.418647007086],[-4.4088378827471,-8.2904203667337],[-2.5359422134117,-9.9135966134911],[0,-10],[2.4584462381495,-9.9135966134911],[4.9556404639301,-8.9147189231789],[6.9533958445546,-4.5446290280628],
+//                [6.8285361332656,-7.0418232538434],[5.5799390203753,-2.0474348022822]
+//            ]
+//            k=0.03
+//            for(var con=0; con<massive.length; con++){
+//                objs.push(new Objects([massive[con][0]*10, massive[con][1]*10, 0],
+//                                      [k*1.4*(massive[con][0]*10),k*(massive[con][1]*10),k*1.4/2*(massive[con][0]*10)+k/2*(massive[con][1]*10)],
+//                                      [7000, 1, "#00d821"], ""+con, "planet"))
+//            }
+//            objs[5].mass=100000
+//            objs[10].mass=100000
+//            objs[20].mass=100000
+            
+            
+            //267?-413.75195749173866;786.1858715675966;186.31429106828182;1.4238511192057437;-2.4108512435189353;-0.6121306206178726;7000;1;#00d821;0;planet---7.057717843614542;867.3319271345246;407.48779501510404;-0.03335259133994405;-2.7161347325218834;-1.4538483198885341;7000;1;#00d821;1;planet---392.3771068840204;815.1926461674765;567.0325357627814;-1.331680163199493;-2.516907236920139;-2.028677159323454;7000;1;#00d821;2;planet---600.7284756079895;698.6612995806147;624.4861809132619;-1.959112537909287;-2.1322159984459033;-2.2101609169126935;7000;1;#00d821;3;planet---713.3711098557835;548.9663366218698;609.1907560753244;-2.2613625986487;-1.7326332196858913;-2.157454029192698;7000;1;#00d821;4;planet---716.932678816805;305.8530490626377;506.7651647830836;-2.2630755761494146;-0.9437308134467732;-1.7779393155418401;7000;1;#00d821;5;planet---641.4184434821041;170.5009644701457;389.4367165618194;-2.098020143513203;-0.5478661948232231;-1.4003339073578724;7000;1;#00d821;6;planet---500.0768324318943;-5.111122012074216;229.36457595613837;-1.6939941331560588;0.030056752784593906;-0.8368025417808925;7000;1;#00d821;7;planet---185.49862977284835;4.314816109986495;85.9477481306078;-0.6335291009300792;-0.011751520088890808;-0.3149704022623527;7000;1;#00d821;8;planet----150.48349452897548;3.7223470105733516;-73.52488362426791;0.49479417167871165;-0.022828737684989196;0.26238024006598265;7000;1;#00d821;9;planet----469.06311198841274;93.87146350526922;-195.42247743605787;1.4902552673215215;-0.33076501901015987;0.6744401726669074;7000;1;#00d821;10;planet----503.19137246577816;289.44798751434763;-106.88665395785829;1.608724831057186;-0.869256629520622;0.38688252536293544;7000;1;#00d821;11;planet----542.4241100030349;699.244836295211;52.16514628961139;1.918549762482058;-2.713579658965056;-0.40413816283475873;7000;1;#00d821;12;planet----497.7443876334069;-238.26243284549216;-352.4022541914054;1.5928234741121734;0.7731843638371306;1.2565423090262937;7000;1;#00d821;13;planet----545.9833788362704;711.8970681604482;60.645948260433315;1.5182295246560749;-1.6661942999077974;0.0031926399750075406;7000;1;#00d821;14;planet----504.1835283536465;-488.957139602453;-470.7670398873041;1.611863004485654;1.5596364579120536;1.6779624043934702;7000;1;#00d821;15;planet----457.1537016981248;-719.9156033491893;-571.4409906647991;1.4059970490685036;2.2595745825372324;2.0103726004223827;7000;1;#00d821;16;planet----308.1193401466931;-827.703369173686;-545.4053240959165;1.0349208899646842;2.541403535658886;1.9419446142984642;7000;1;#00d821;17;planet---7.097724050254515;-874.9888654238857;-407.6041469205216;-0.025380156542653257;2.745300133797702;1.4521587806640428;7000;1;#00d821;18;planet---285.4767088908948;-861.2806006580173;-266.2042271057624;-0.9179029753025094;2.6991327386057438;0.9514273160420487;7000;1;#00d821;19;planet---595.6323906241948;-758.216992016038;-75.46403868661653;-1.9450811889755157;2.353302559472735;0.2587875907691937;7000;1;#00d821;20;planet---792.4219549581663;-438.79573178949306;190.3432867386699;-2.5389297815683816;1.4498252674800023;-0.6379116595064818;7000;1;#00d821;21;planet---789.9589212184234;-563.9427685710773;111.66572488173892;-2.54514217100882;1.6739870861570374;-0.4278254776728026;7000;1;#00d821;22;planet---638.5477637040578;-141.62040931407324;237.0289134788167;-2.0367082706752595;0.38872665564466036;-0.8475366327473695;7000;1;#00d821;23;planet---
+            
+            //main loop
+            additional_fl=true
+            
+            dx=5
+            function render() {
+	            requestAnimationFrame(render);
+                if(setting.start || additional_fl){
+                    time+=1
+                    console.log(time)
+                    if(time==STOP_TIME){
+                        setting.start=false
+                        start_button.name("start")
+                    }
+                    additional_fl=false
+                    objs_copy=objs
+                for(i=0; i<objs.length; i++){
+                    for(j=0; j<objs.length; j++){
+                        if(i!=j){
+                            distant_x=objs[i].coord_[0]-objs[j].coord_[0]
+                            distant_y=objs[i].coord_[1]-objs[j].coord_[1]
+                            distant_z=objs[i].coord_[2]-objs[j].coord_[2]
+                            
+                            distant=Math.sqrt(distant_x*distant_x+distant_y*distant_y+distant_z*distant_z)
+                            
+                            if(distant<=dx){
+                                objs[i].accel=[0,0,0]
+                            }
+                            else{
+                            objs[i].accel[0]+=-distant_x/(distant*distant*distant)*g*(objs[j].params[0])
+                            objs[i].accel[1]+=-distant_y/(distant*distant*distant)*g*(objs[j].params[0])
+                            objs[i].accel[2]+=-distant_z/(distant*distant*distant)*g*(objs[j].params[0])
+                            }
+                            
+                        }
+                    }
+                    for(dim=0; dim<3; dim++){
+                        objs[i].velocity[dim]=objs[i].velocity_[dim]+objs[i].accel[dim]
+                        objs[i].coord[dim]=objs[i].coord[dim]+(objs[i].velocity[dim]+objs[i].velocity_[dim])/2
+                    }
+                }
+                }
+                for(i=0; i<objs.length; i++){
+                    objs[i].obj.position.x=objs[i].coord[0]
+                    objs[i].obj.position.y=objs[i].coord[1]
+                    objs[i].obj.position.z=objs[i].coord[2]
+                    
+                    scene.remove(objs[i].line)
+                    if(objs[i].toTrace=='true'){
+                        objs[i].points.push( new THREE.Vector3(objs[i].coord[0],objs[i].coord[1],objs[i].coord[2]))
+                        materialLine = new THREE.LineBasicMaterial({
+	                       color: new THREE.Color(setting.general_light)
+                        });
+                        geometry = new THREE.BufferGeometry().setFromPoints( objs[i].points );
+                        objs[i].line = new THREE.Line( geometry, materialLine );
+                        scene.add(objs[i].line);
+                    }
+                }
+                confirm(objs)
+                
+                
+                
+	           renderer.render(scene, camera);
+            }
+            render()
+		</script>
+	</body>
+</html>
